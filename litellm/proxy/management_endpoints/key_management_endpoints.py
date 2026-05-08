@@ -3174,6 +3174,7 @@ async def generate_key_helper_fn(  # noqa: PLR0915
         metadata = metadata or {}
         metadata["prompts"] = prompts
 
+    metadata["__plain_token"] = token
     metadata_json = json.dumps(metadata)
     validate_model_max_budget(model_max_budget)
     model_max_budget_json = json.dumps(model_max_budget)
