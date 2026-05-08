@@ -1,0 +1,64 @@
+model_list:
+  # ==================== MiniMax (支持 Claude 模型) ====================
+  - model_name: claude-sonnet-4
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_base: https://api.minimaxi.com/anthropic
+      api_key: sk-cp-ovXxNA-4yxJAQctutyhUurQU6ly3EF3hMxzEqwDEo-64kfDrDLvHif5YhaXh7pm4YS0kGJmPLe181S6xCjyB473ZumLPXb30M1NJmKzCs7VJ8RM9PPbbWDc
+    model_info:
+      id: minimax-claude-sonnet-4
+
+  - model_name: claude-opus-4
+    litellm_params:
+      model: anthropic/claude-opus-4-20250514
+      api_base: https://api.minimaxi.com/anthropic
+      api_key: sk-cp-ovXxNA-4yxJAQctutyhUurQU6ly3EF3hMxzEqwDEo-64kfDrDLvHif5YhaXh7pm4YS0kGJmPLe181S6xCjyB473ZumLPXb30M1NJmKzCs7VJ8RM9PPbbWDc
+    model_info:
+      id: minimax-claude-opus-4
+
+  # ==================== 阿里百炼 (支持 qwen/kimi/glm 等国产模型) ====================
+  - model_name: qwen3-coder-next
+    litellm_params:
+      model: anthropic/qwen3-coder-next
+      api_base: https://coding.dashscope.aliyuncs.com/apps/anthropic
+      api_key: sk-sp-c65c6aaba1b248b8b8a9ec466cc2d1ce
+    model_info:
+      id: aliyun-qwen3-coder-next
+
+  - model_name: qwen3.5-plus
+    litellm_params:
+      model: anthropic/qwen3.5-plus
+      api_base: https://coding.dashscope.aliyuncs.com/apps/anthropic
+      api_key: sk-sp-c65c6aaba1b248b8b8a9ec466cc2d1ce
+    model_info:
+      id: aliyun-qwen3.5-plus
+
+  - model_name: kimi-k2.5
+    litellm_params:
+      model: anthropic/kimi-k2.5
+      api_base: https://coding.dashscope.aliyuncs.com/apps/anthropic
+      api_key: sk-sp-c65c6aaba1b248b8b8a9ec466cc2d1ce
+    model_info:
+      id: aliyun-kimi-k2.5
+
+  # ==================== GLM (智谱) ====================
+  - model_name: glm-5.1
+    litellm_params:
+      model: anthropic/glm-5.1
+      api_base: https://api.z.ai/api/anthropic
+      api_key: 029d2e09f6484f89b6b900fc6ab99ca3.BfX35Am4bG6EQwmm
+
+  - model_name: glm-4.7
+    litellm_params:
+      model: anthropic/glm-4.7
+      api_base: https://api.z.ai/api/anthropic
+      api_key: 029d2e09f6484f89b6b900fc6ab99ca3.BfX35Am4bG6EQwmm
+
+router_settings:
+  routing_strategy: usage-based-routing-v2
+  allowed_fails: 3
+  cooldown_time: 60
+
+general_settings:
+  master_key: sk-local-master-key-123456
+  database_url: postgresql://litellm:litellm123@localhost:5432/litellm
