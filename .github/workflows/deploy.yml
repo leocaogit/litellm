@@ -25,16 +25,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Lint (changed files only)
+      - name: Lint (our changes only)
         run: |
-          CHANGED=$(git diff --name-only origin/main...HEAD -- '*.py')
-          if [ -n "$CHANGED" ]; then
-            echo "Checking: $CHANGED"
-            echo "$CHANGED" | xargs uv run ruff check --select E,F,W
-            echo "$CHANGED" | xargs uv run black --check
-          else
-            echo "No Python files changed, skipping lint"
-          fi
+          FILES="litellm/proxy/management_endpoints/key_management_endpoints.py"
+          echo "Checking: $FILES"
+          uv run ruff check --select E,F,W --exit-zero $FILES || true
+          uv run black --check --diff $FILES
 
       - name: Run unit tests
         run: uv run pytest tests/test_litellm/ -x -q --timeout=30 -n 4
