@@ -1,0 +1,115 @@
+name: Deploy to ECS
+
+on:
+  push:
+    branches:
+      - litellm_internal_staging
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: litellm
+  ECS_CLUSTER: openclaw-enterprise-always-on
+  ECS_SERVICE: litellm-dev
+  ECS_TASK_FAMILY: litellm-dev
+  CONTAINER_NAME: litellm
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::303529433406:role/litellm-github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate image metadata
+        id: meta
+        run: |
+          IMAGE_TAG=${GITHUB_SHA::8}
+          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "full_image=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "branch_image=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.full_image }}
+            ${{ steps.meta.outputs.branch_image }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.ECS_TASK_FAMILY }} \
+            --query 'taskDefinition' \
+            --output json > task-definition.json
+
+      - name: Update task definition with new image
+        run: |
+          jq --arg IMAGE "${{ steps.meta.outputs.full_image }}" \
+            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) |
+             .containerDefinitions[0].image = $IMAGE' \
+            task-definition.json > new-task-def.json
+          cat new-task-def.json
+
+      - name: Register new task definition
+        id: register
+        run: |
+          aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text > /tmp/new-task-arn
+          echo "task_arn=$(cat /tmp/new-task-arn)" >> $GITHUB_OUTPUT
+          echo "Registered: $(cat /tmp/new-task-arn)"
+
+      - name: Deploy to ECS
+        run: |
+          echo "Deploying ${{ steps.register.outputs.task_arn }} to ECS"
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --task-definition ${{ steps.register.outputs.task_arn }} \
+            --force-new-deployment
+
+      - name: Wait for service to stabilize
+        run: |
+          echo "Waiting for ECS service to stabilize (max 5 minutes)..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }}
+          echo "Deployment complete!"
+
+      - name: Health check
+        run: |
+          echo "Running health check..."
+          sleep 10
+          curl -fsS http://litellm-dev-alb-1102571879.us-west-2.elb.amazonaws.com/health/readiness
+          echo "Health check passed!"
